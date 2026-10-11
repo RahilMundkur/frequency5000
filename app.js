@@ -831,7 +831,6 @@
     store.settings.lang = l;
     saveStore(); applyLang();
     if (!$('sheet').hidden) closeSheet();
-    if (l === 'zh' && COURSE !== 'en') { switchCourse('en'); return; }   // the Chinese interface is for learning English
     render();
   }
 
@@ -1095,8 +1094,6 @@
     var cui = COURSE_UI[lang()];
     var cs = h('div', { class: 'cat-menu course-switch', role: 'group', 'aria-label': cui.label });
     COURSE_IDS.forEach(function (id) {
-      if (id === 'th' && lang() === 'th' && COURSE !== id) return;   // the Thai course is for non-Thai speakers
-      if (lang() === 'zh' && id !== 'en' && COURSE !== id) return;   // Chinese speakers learn English here
       cs.appendChild(h('button', { class: 'chip course-chip', type: 'button', lang: lang(), 'aria-pressed': String(id === COURSE), onclick: function () { switchCourse(id); } }, [cui[id]]));
     });
     root.appendChild(h('div', { class: 'course-wrap' }, [h('div', { class: 'range-label', style: 'margin-top:0', text: cui.label }), cs]));
