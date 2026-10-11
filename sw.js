@@ -1,5 +1,5 @@
 /* Offline support: precache the app shell and serve cache-first. */
-var CACHE = 'frequency5000-v3';
+var CACHE = 'frequency5000-v9';
 var SHELL = [
   './',
   'index.html',
@@ -7,6 +7,8 @@ var SHELL = [
   'app.js',
   'data-fr.js',
   'data-en.js',
+  'data-thai.js',
+  'data-zh.js',
   'pics.js',
   'config.js',
   'manifest.webmanifest',

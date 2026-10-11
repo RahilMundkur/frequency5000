@@ -1,10 +1,11 @@
 (function () {
   'use strict';
-  var COURSE_IDS = ['fr', 'en'];
-  var COURSE_META = { fr: { data: 'FRENCH_DATA', file: 'data-fr.js' }, en: { data: 'ENGLISH_DATA', file: 'data-en.js' } };
+  var COURSE_IDS = ['fr', 'en', 'th', 'zh'];
+  var COURSE_META = { fr: { data: 'FRENCH_DATA', file: 'data-fr.js' }, en: { data: 'ENGLISH_DATA', file: 'data-en.js' }, th: { data: 'THAI_DATA', file: 'data-thai.js' }, zh: { data: 'MANDARIN_DATA', file: 'data-zh.js' } };
   var COURSE_UI = {
-    th: { label: 'เลือกภาษาที่จะเรียน', fr: 'ภาษาฝรั่งเศส (Français)', en: 'ภาษาอังกฤษ (English)' },
-    en: { label: 'I want to learn', fr: 'French (Français)', en: 'English' }
+    th: { label: 'เลือกภาษาที่จะเรียน', fr: 'ภาษาฝรั่งเศส (Français)', en: 'ภาษาอังกฤษ (English)', th: 'ภาษาไทย (Thai)', zh: 'ภาษาจีนกลาง (中文)' },
+    en: { label: 'I want to learn', fr: 'French (Français)', en: 'English', th: 'Thai (ไทย)', zh: 'Mandarin Chinese (中文)' },
+    fr: { label: 'Je veux apprendre', fr: 'Le français', en: 'L’anglais (English)', th: 'Le thaï (ไทย)', zh: 'Le mandarin (中文)' }
   };
   var THEME_UI = {
     th: {
@@ -20,11 +21,21 @@
       credit: 'Pictures: Twemoji by Twitter, Inc. and other contributors, used under CC-BY 4.0.',
       freqNote: 'The main 5,000-word list is chosen strictly by real usage frequency. Words in the themes that are not in that list are ranked by frequency inside their own theme.',
       names: { animals: 'Animals', food: 'Food & drink', body: 'Body & clothes', home: 'Home & family', town: 'Town & travel', nature: 'Nature & weather', school: 'School, work & fun', basics: 'Colours, numbers & time', more: 'More words' }
+    },
+    fr: {
+      menu: 'Thèmes (avec images)', hint: 'Séries de mots par thème, avec des images, classés par fréquence dans chaque thème – idéal pour les enfants.',
+      showPics: 'Afficher les images', picsOnly: 'Images seulement (masquer la traduction)', picsOnlyShort: '🖼 Images seulement',
+      credit: 'Images : Twemoji par Twitter, Inc. et d’autres contributeurs, utilisées sous licence CC-BY 4.0.',
+      freqNote: 'La liste principale de 5 000 mots est choisie uniquement selon la fréquence d’usage réelle. Les mots des thèmes qui n’en font pas partie sont classés par fréquence à l’intérieur de leur thème.',
+      names: { animals: 'Animaux', food: 'Nourriture et boissons', body: 'Corps et vêtements', home: 'Maison et famille', town: 'Ville et voyage', nature: 'Nature et météo', school: 'École, travail et loisirs', basics: 'Couleurs, nombres et temps', more: 'Autres mots' }
     }
   };
   var COURSE = 'fr';
   var BRAND = 'Frequency5000';
   var DATA, CAT_IDS, APP_ID, DEFAULT_RATE, HW_LANG, SPEECH_LANG, VOICE_LANG_RE, TEST_PHRASE;
+  function exText(w) { return (COURSE === 'zh' && store.settings.script === 'trad' && w.ext) ? w.ext : w.ex; }   // Mandarin: simplified or traditional example
+  function exPyLine(w) { return (COURSE === 'zh' && store.settings.exPy !== false && w.exRom) ? h('p', { class: 'rom', text: w.exRom }) : null; }
+  function romTag(w) { return w.rom ? w.rom + ' · ' : ''; }   // Thai course: romanisation with tone marks
   function posTag(w) { return posLabel(w.pos) + (w.g ? ' (' + w.g + ')' : ''); }   // French nouns written l' also show m / f
   var hw, wkey, meanLang, mean, exTr, clash, BAD_VOICES, voiceScore, CAT_NAMES, CAT_HINT, posLabel, STR;
   var COURSES = {};
@@ -177,18 +188,28 @@
   function defaultLang() { return 'th'; }
   function hw(w) { return w.en; }
   function wkey(w) { return w.en + '|' + w.pos; }
-  function meanLang() { return 'th'; }
-  function mean(w) { return w.th; }
-  function exTr(w) { return w.exTh; }
-  function tparts(g) {
+  // Meanings and example translations follow the app language: French for French speakers, Thai otherwise.
+  function meanLang() { return lang() === 'fr' ? 'fr' : 'th'; }
+  function mean(w) { return lang() === 'fr' && w.fr ? w.fr : w.th; }
+  function exTr(w) { return lang() === 'fr' && w.exFr ? w.exFr : w.exTh; }
+  function tparts(g, fr) {
     var out = {};
-    g.split(/[\/,;]/).forEach(function (x) { x = x.replace(/\(.*?\)/g, '').trim(); if (x) out[x] = 1; });
+    g.split(/[\/,;]/).forEach(function (x) {
+      x = x.replace(/\(.*?\)/g, '').trim();
+      if (fr) x = x.toLowerCase().replace(/^(le |la |les |l'|un |une |des |se |s')/, '');
+      if (x) out[x] = 1;
+    });
     return out;
   }
   function clash(a, b) {
     if (a.en === b.en) return true;
     var pa = tparts(a.th), pb = tparts(b.th);
-    return Object.keys(pa).some(function (k) { return pb[k]; });
+    if (Object.keys(pa).some(function (k) { return pb[k]; })) return true;
+    if (a.fr && b.fr) {
+      var fa = tparts(a.fr, true), fb = tparts(b.fr, true);
+      return Object.keys(fa).some(function (k) { return fb[k]; });
+    }
+    return false;
   }
 
   // Novelty / robotic voices that ship with macOS and some browsers: never offer or auto-pick these.
@@ -205,14 +226,20 @@
 
   var CAT_NAMES = {
     th: { all: 'ทั้งหมด', noun: 'คำนาม', verb: 'คำกริยา', adjective: 'คำคุณศัพท์', adverb: 'คำกริยาวิเศษณ์', preposition: 'คำบุพบท', other: 'อื่นๆ' },
-    en: { all: 'All', noun: 'Nouns', verb: 'Verbs', adjective: 'Adjectives', adverb: 'Adverbs', preposition: 'Prepositions', other: 'Other' }
+    en: { all: 'All', noun: 'Nouns', verb: 'Verbs', adjective: 'Adjectives', adverb: 'Adverbs', preposition: 'Prepositions', other: 'Other' },
+    fr: { all: 'Tous', noun: 'Noms', verb: 'Verbes', adjective: 'Adjectifs', adverb: 'Adverbes', preposition: 'Prépositions', other: 'Autres' }
   };
   var CAT_HINT = {
     th: 'อื่นๆ = สรรพนาม จำนวน ตัวกำหนด สันธาน อุทาน และคำนำหน้านาม',
-    en: 'Other = pronouns, numbers, determiners, conjunctions, interjections and articles'
+    en: 'Other = pronouns, numbers, determiners, conjunctions, interjections and articles',
+    fr: 'Autres = pronoms, nombres, déterminants, conjonctions, interjections et articles'
   };
   var POS_TH = { noun: 'นาม', verb: 'กริยา', adjective: 'คุณศัพท์', adverb: 'กริยาวิเศษณ์', preposition: 'บุพบท', pronoun: 'สรรพนาม', number: 'จำนวน', determiner: 'ตัวกำหนด', conjunction: 'สันธาน', interjection: 'อุทาน', article: 'คำนำหน้านาม' };
-  function posLabel(p) { return lang() === 'th' && POS_TH[p] ? POS_TH[p] + ' (' + p + ')' : p; }
+  var POS_FR = { noun: 'nom', verb: 'verbe', adjective: 'adjectif', adverb: 'adverbe', preposition: 'préposition', pronoun: 'pronom', number: 'nombre', determiner: 'déterminant', conjunction: 'conjonction', interjection: 'interjection', article: 'article' };
+  function posLabel(p) {
+    if (lang() === 'fr' && POS_FR[p]) return POS_FR[p] + ' (' + p + ')';
+    return lang() === 'th' && POS_TH[p] ? POS_TH[p] + ' (' + p + ')' : p;
+  }
 
   var STR = {
     th: {
@@ -284,6 +311,267 @@
       reportWord: '⚑ Report a problem with this word',
       reviewBtn: 'Review missed words', reviewCount: ' words to review', reviewNone: 'No missed words yet – great!', reviewStart: 'Start review',
       reviewDone: 'Review complete!', reviewLeft: ' words still to review', reviewAllClear: 'No missed words left – well done!', reviewAgain: 'Review again'
+    },
+    fr: {
+      appName: 'Eng 5000', pageTitle: 'Eng 5000 – Apprenez les 5 000 mots anglais les plus courants',
+      metaDesc: 'Apprenez les 5 000 mots anglais les plus courants avec des jeux d’association, la prononciation et des phrases d’exemple.',
+      homeTitle: 'Apprenez les 5 000 mots anglais les plus courants',
+      homeIntro: 'Associez 20 mots à la fois. Touchez un mot anglais pour l’entendre, et l’ampoule pour voir une phrase d’exemple.',
+      voiceHintText: 'La voix vous semble bizarre ? Choisissez-en une autre dans les réglages (les voix marquées ★ sonnent plus naturelles, par ex. Samantha).', voiceHintBtn: 'Choisir une voix', voiceHintClose: 'Ne plus afficher',
+      testMe: 'Que voulez-vous travailler ?',
+      nextSet: 'Suite : série ', words: 'Mots ', allDone: 'Toutes les séries sont terminées !', replayHint: 'Rejouez n’importe quelle série pour gagner plus d’étoiles.',
+      cont: 'Continuer', start: 'Commencer', replay1: 'Rejouer la série 1',
+      setsDone: 'séries terminées', wordsPracticed: 'mots travaillés', stars: 'étoiles',
+      setWord: 'Série ', matchedAria: 'Mots associés', matched: 'associé', mistake: 'erreur',
+      autoSpeak: 'Lecture auto', shuffle: 'Mélanger', allSets: 'Toutes les séries',
+      listen: 'Écouter ', hintFor: 'Phrase d’exemple pour ', example: 'Exemple', listenWord: '🔊 Mot', listenSentence: '🔊 Phrase',
+      noSpeech: 'La synthèse vocale n’est pas prise en charge par ce navigateur.',
+      noVoice: 'Aucune voix anglaise trouvée sur cet appareil. Installez-en une dans les réglages du système.',
+      complete: ' terminée !', perfect: 'Parfait – aucune erreur !', mistakesRound: ' dans ce tour.', nextBtn: 'Série suivante →', again: 'Rejouer', review: 'Réviser',
+      settings: 'Réglages', voice: 'Voix', auto: 'Automatique', speed: 'Vitesse de la voix', theme: 'Thème', themeAuto: 'Selon l’appareil', themeLight: 'Clair', themeDark: 'Sombre',
+      testVoice: 'Tester la voix', play: '🔊 Écouter', voicesN: ' voix anglaise(s) disponible(s)', noVoices: 'Aucune voix anglaise détectée sur cet appareil',
+      reset: 'Effacer la progression', confirmReset: 'Effacer toute la progression sur cet appareil ?', language: 'Langue de l’application', close: 'Fermer',
+      about: 'À propos d’Eng 5000',
+      about1: 'Eng 5000 aide les francophones à apprendre les 5 000 mots anglais les plus fréquents, par séries de 20 (tout travailler, ou choisir les noms, les verbes, les adjectifs, etc.), avec des jeux d’association, la prononciation et des phrases d’exemple.',
+      about2: 'Les sens en français et les traductions des phrases ont été écrits spécialement pour cette application. Ce sont de courtes traductions destinées à l’apprentissage, pas des articles de dictionnaire, et elles peuvent contenir des erreurs. Si vous en trouvez une, utilisez le bouton « Commentaires » pour la signaler à l’auteur.',
+      ack: 'Remerciements',
+      about3: 'Le choix et l’ordre des mots s’appuient sur des fréquences calculées à partir de sous-titres de films et de séries (le projet « FrequencyWords » de Hermit Dave, d’après OpenSubtitles, licence CC BY-SA 4.0). Seul le classement des mots a été utilisé. Les sens et les phrases sont originaux.',
+      about4: 'La prononciation utilise les voix intégrées à votre appareil ou navigateur ; la qualité varie. L’application ne charge aucun code, police ou outil de suivi externe, conserve la progression uniquement sur votre appareil et fonctionne hors ligne après le premier chargement.',
+      loadFail: 'Échec du chargement du vocabulaire.', home: 'Accueil', aboutTitle: 'À propos', settingsTitle: 'Réglages',
+      feedbackBtn: 'Commentaires', feedbackTitle: 'Envoyer un commentaire ou signaler une erreur', fbType: 'Type',
+      fbMistake: 'Erreur dans un mot ou une traduction', fbSuggestion: 'Suggestion', fbBug: 'Quelque chose ne fonctionne pas',
+      fbWord: 'Mot concerné (facultatif)', fbMsg: 'Message', fbPlaceholder: 'Dites-nous ce qui ne va pas, par ex. quelle devrait être la bonne traduction',
+      fbSend: '✉ Envoyer par e-mail', fbOpenForm: 'Ouvrir le formulaire', fbCopy: 'Copier le message', fbCopied: 'Message copié', fbEmpty: 'Veuillez d’abord écrire un message.',
+      fbNoEmail: 'L’auteur n’a pas encore configuré d’adresse pour les commentaires. Copiez le message et envoyez-le directement à l’auteur.',
+      reportWord: '⚑ Signaler un problème avec ce mot',
+      reviewBtn: 'Réviser les mots ratés', reviewCount: ' mots à réviser', reviewNone: 'Aucun mot raté pour l’instant – bravo !', reviewStart: 'Commencer la révision',
+      reviewDone: 'Révision terminée !', reviewLeft: ' mots restent à réviser', reviewAllClear: 'Plus aucun mot raté – bien joué !', reviewAgain: 'Réviser encore'
+    }
+  };
+  /* ==== END APP CONFIG ==== */
+
+  return { DATA: DATA, CAT_IDS: CAT_IDS, DEFAULT_RATE: DEFAULT_RATE, HW_LANG: HW_LANG, SPEECH_LANG: SPEECH_LANG, VOICE_LANG_RE: VOICE_LANG_RE, TEST_PHRASE: TEST_PHRASE, hw: hw, wkey: wkey, meanLang: meanLang, mean: mean, exTr: exTr, clash: clash, BAD_VOICES: BAD_VOICES, voiceScore: voiceScore, CAT_NAMES: CAT_NAMES, CAT_HINT: CAT_HINT, posLabel: posLabel, STR: STR };
+  };
+  COURSES.th = function () {
+  /* ==== APP CONFIG (Thai 5000) ==== */
+  var DATA = window.THAI_DATA || { words: [], cats: {} };
+  var CAT_IDS = ['all', 'noun', 'verb', 'adjective', 'adverb', 'preposition', 'other'];
+  var STORE_KEY = 'thai5000.v1';
+  var OLD_KEY = null;
+  var APP_ID = 'thai5000';
+  var DEFAULT_RATE = 1;
+  var HW_LANG = 'th';
+  var SPEECH_LANG = 'th-TH';
+  var VOICE_LANG_RE = /^th/i;
+  var TEST_PHRASE = 'สวัสดีครับ วันนี้คุณสบายดีไหม';
+  function defaultLang() { return 'en'; }
+  function hw(w) { return w.th; }
+  function wkey(w) { return w.th + '|' + w.pos; }
+  // Meanings are English: this course is for English speakers learning Thai.
+  function meanLang() { return 'en'; }
+  function mean(w) { return w.en; }
+  function exTr(w) { return w.exEn; }
+  function tparts(g) {
+    var out = {};
+    g.split(/[\/,;]/).forEach(function (x) {
+      x = x.replace(/\(.*?\)/g, '').trim().toLowerCase().replace(/^(to|the|a|an) /, '');
+      if (x) out[x] = 1;
+    });
+    return out;
+  }
+  function clash(a, b) {
+    if (a.th === b.th) return true;
+    var pa = tparts(a.en), pb = tparts(b.en);
+    return Object.keys(pa).some(function (k) { return pb[k]; });
+  }
+
+  // Novelty / robotic voices that ship with macOS and some browsers: never offer or auto-pick these.
+  var BAD_VOICES = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|fred|good news|hysterical|jester|junior|kathy|organ|ralph|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|espeak|compact)\b/i;
+  // Preferred natural voices, best first (macOS, iOS, Chrome, Edge/Windows, Android).
+  var GOOD_VOICES = [/\b(kanya|narisa)\b/i, /premium|enhanced|natural|neural/i, /\b(premwadee|niwat|achara|pattara)\b/i, /google/i];
+  function voiceScore(v) {
+    var sc = 0;
+    for (var i = 0; i < GOOD_VOICES.length; i++) if (GOOD_VOICES[i].test(v.name)) { sc = 12 - i * 2; break; }
+    if (/^th-TH/i.test(v.lang)) sc += 2;
+    if (v.localService === false) sc += 0.5;
+    return sc;
+  }
+
+  var CAT_NAMES = {
+    en: { all: 'All', noun: 'Nouns', verb: 'Verbs', adjective: 'Adjectives', adverb: 'Adverbs', preposition: 'Prepositions', other: 'Other' }
+  };
+  var CAT_HINT = {
+    en: 'Other = pronouns, numbers, determiners, conjunctions, particles, classifiers and interjections'
+  };
+  function posLabel(p) { return p; }
+
+  var STR = {
+    en: {
+      appName: 'Thai 5000', pageTitle: 'Thai 5000 – Learn 5,000 Thai words',
+      metaDesc: 'Learn the 5,000 most common Thai words with romanisation, matching games, speech and example sentences.',
+      homeTitle: 'Learn the 5,000 most common Thai words',
+      homeIntro: 'Match 20 words at a time. Tap a Thai word to hear it, and tap the light bulb for an example sentence. Each word shows its romanisation with tone marks.',
+      voiceHintText: 'Does the voice sound odd? Pick another one in Settings (voices marked ★ sound more natural, e.g. Kanya or Narisa).', voiceHintBtn: 'Pick a voice', voiceHintClose: 'Don’t show again',
+      testMe: 'Choose what to practise',
+      nextSet: 'Next: set ', words: 'Words ', allDone: 'All sets complete!', replayHint: 'Replay any set to improve your stars.',
+      cont: 'Continue', start: 'Start', replay1: 'Replay set 1',
+      setsDone: 'sets completed', wordsPracticed: 'words practised', stars: 'stars',
+      setWord: 'Set ', matchedAria: 'Matched words', matched: 'matched', mistake: 'mistake',
+      autoSpeak: 'Auto-speak', shuffle: 'Shuffle', allSets: 'All sets',
+      listen: 'Listen to ', hintFor: 'Example sentence for ', example: 'Example', listenWord: '🔊 Word', listenSentence: '🔊 Sentence',
+      noSpeech: 'Speech is not supported in this browser.',
+      noVoice: 'No Thai voice found on this device. Install one in your system settings (the Thai text can still be read from the screen).',
+      complete: ' complete!', perfect: 'Perfect – no mistakes!', mistakesRound: ' this round.', nextBtn: 'Next set →', again: 'Play again', review: 'Review',
+      settings: 'Settings', voice: 'Voice', auto: 'Automatic', speed: 'Speech speed', theme: 'Theme', themeAuto: 'Match device', themeLight: 'Light', themeDark: 'Dark',
+      testVoice: 'Test the voice', play: '🔊 Play', voicesN: ' Thai voice(s) available', noVoices: 'No Thai voice detected on this device',
+      reset: 'Reset progress', confirmReset: 'Erase all progress on this device?', language: 'App language', close: 'Close',
+      about: 'About Thai 5000',
+      about1: 'Thai 5000 helps English speakers learn the 5,000 most frequently used Thai words, in sets of 20 (practise everything, or pick nouns, verbs, adjectives and so on), using matching games, spoken pronunciation, example sentences and a romanisation with tone marks.',
+      about2: 'The English meanings, example sentences and translations in this app were written specifically for it. They are short, simple glosses meant for learning, not dictionary entries, and may occasionally contain mistakes. The romanisation is generated automatically from a pronunciation dictionary and may be wrong for some words. If you find a mistake, please use the feedback button to tell the app’s author.',
+      ack: 'Acknowledgements',
+      about3: 'The choice and order of words was informed by word-frequency counts from film and television subtitles (the “FrequencyWords” project by Hermit Dave, based on OpenSubtitles, licensed CC BY-SA 4.0), cross-checked against the Thai National Corpus word counts distributed with PyThaiNLP (Apache-2.0). The romanisation uses the pronunciation dictionary of TLTK by Wirote Aroonmanakun (BSD-3-Clause). Only rankings and pronunciations were used; the meanings and sentences are original.',
+      about4: 'Pronunciation uses the speech voices built into your device or browser; quality varies. The app does not load any third-party code, fonts or tracking, stores progress only on your device, and works offline once loaded.',
+      loadFail: 'Vocabulary data failed to load.', home: 'Home', aboutTitle: 'About', settingsTitle: 'Settings',
+      feedbackBtn: 'Feedback', feedbackTitle: 'Send feedback or report a mistake', fbType: 'Type',
+      fbMistake: 'Mistake in a word or translation', fbSuggestion: 'Suggestion', fbBug: 'Something is broken',
+      fbWord: 'Word concerned (optional)', fbMsg: 'Message', fbPlaceholder: 'Tell us what is wrong, e.g. what the correct translation should be',
+      fbSend: '✉ Send by email', fbOpenForm: 'Open the form', fbCopy: 'Copy message', fbCopied: 'Message copied', fbEmpty: 'Please write a message first.',
+      fbNoEmail: 'The author has not set up a feedback address yet. Copy the message and send it to the author directly.',
+      reportWord: '⚑ Report a problem with this word',
+      reviewBtn: 'Review missed words', reviewCount: ' words to review', reviewNone: 'No missed words yet – great!', reviewStart: 'Start review',
+      reviewDone: 'Review complete!', reviewLeft: ' words still to review', reviewAllClear: 'No missed words left – well done!', reviewAgain: 'Review again'
+    }
+  };
+  /* ==== END APP CONFIG ==== */
+
+  return { DATA: DATA, CAT_IDS: CAT_IDS, DEFAULT_RATE: DEFAULT_RATE, HW_LANG: HW_LANG, SPEECH_LANG: SPEECH_LANG, VOICE_LANG_RE: VOICE_LANG_RE, TEST_PHRASE: TEST_PHRASE, hw: hw, wkey: wkey, meanLang: meanLang, mean: mean, exTr: exTr, clash: clash, BAD_VOICES: BAD_VOICES, voiceScore: voiceScore, CAT_NAMES: CAT_NAMES, CAT_HINT: CAT_HINT, posLabel: posLabel, STR: STR };
+  };
+  COURSES.zh = function () {
+  /* ==== APP CONFIG (Mandarin 5000) ==== */
+  var DATA = window.MANDARIN_DATA || { words: [], cats: {} };
+  var CAT_IDS = ['all', 'noun', 'verb', 'adjective', 'adverb', 'preposition', 'other'];
+  var STORE_KEY = 'mandarin5000.v1';
+  var OLD_KEY = null;
+  var APP_ID = 'mandarin5000';
+  var DEFAULT_RATE = 1;
+  var HW_LANG = 'zh-CN';
+  var SPEECH_LANG = 'zh-CN';
+  var VOICE_LANG_RE = /^zh/i;
+  var TEST_PHRASE = '你好，今天你过得怎么样？';
+  function defaultLang() { return 'en'; }
+  function hw(w) { return (store.settings.script === 'trad' && w.zt) ? w.zt : w.zh; }
+  function wkey(w) { return w.zh + '|' + w.pos; }
+  // Meanings are English, or Thai when the interface is Thai (and the entry has a Thai meaning).
+  function meanLang() { return lang() === 'th' ? 'th' : 'en'; }
+  function mean(w) { return lang() === 'th' && w.th ? w.th : w.en; }
+  function exTr(w) { return lang() === 'th' && w.exTh ? w.exTh : w.exEn; }
+  function tparts(g) {
+    var out = {};
+    g.split(/[\/,;]/).forEach(function (x) {
+      x = x.replace(/\(.*?\)/g, '').trim().toLowerCase().replace(/^(to|the|a|an) /, '');
+      if (x) out[x] = 1;
+    });
+    return out;
+  }
+  function clash(a, b) {
+    if (a.zh === b.zh) return true;
+    var pa = tparts(a.en), pb = tparts(b.en);
+    return Object.keys(pa).some(function (k) { return pb[k]; });
+  }
+
+  // Novelty / robotic voices that ship with macOS and some browsers: never offer or auto-pick these.
+  var BAD_VOICES = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|fred|good news|hysterical|jester|junior|kathy|organ|ralph|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|espeak|compact)\b/i;
+  // Preferred natural voices, best first (macOS, iOS, Chrome, Edge/Windows, Android).
+  var GOOD_VOICES = [/\b(tingting|ting-ting|meijia|sinji|lilian|yu-shu|yushu)\b/i, /premium|enhanced|natural|neural|xiaoxiao|yunxi|hsiaochen/i, /\b(huihui|yaoyao|kangkang)\b/i, /google/i];
+  function voiceScore(v) {
+    var sc = 0;
+    for (var i = 0; i < GOOD_VOICES.length; i++) if (GOOD_VOICES[i].test(v.name)) { sc = 12 - i * 2; break; }
+    if (/^zh-CN/i.test(v.lang)) sc += 2;
+    if (v.localService === false) sc += 0.5;
+    return sc;
+  }
+
+  var CAT_NAMES = {
+    th: { all: 'ทั้งหมด', noun: 'คำนาม', verb: 'คำกริยา', adjective: 'คำคุณศัพท์', adverb: 'คำกริยาวิเศษณ์', preposition: 'คำบุพบท', other: 'อื่นๆ' },
+    en: { all: 'All', noun: 'Nouns', verb: 'Verbs', adjective: 'Adjectives', adverb: 'Adverbs', preposition: 'Prepositions', other: 'Other' }
+  };
+  var CAT_HINT = {
+    th: 'อื่นๆ = สรรพนาม จำนวน ตัวกำหนด สันธาน อนุภาค ลักษณนาม และคำอุทาน',
+    en: 'Other = pronouns, numbers, determiners, conjunctions, particles, classifiers and interjections'
+  };
+  var POS_TH = { noun: 'นาม', verb: 'กริยา', adjective: 'คุณศัพท์', adverb: 'กริยาวิเศษณ์', preposition: 'บุพบท', pronoun: 'สรรพนาม', number: 'จำนวน', determiner: 'ตัวกำหนด', conjunction: 'สันธาน', interjection: 'อุทาน', particle: 'อนุภาค', classifier: 'ลักษณนาม', phrase: 'วลี' };
+  function posLabel(p) { return lang() === 'th' && POS_TH[p] ? POS_TH[p] + ' (' + p + ')' : p; }
+
+  var STR = {
+    th: {
+      appName: 'Mandarin 5000', pageTitle: 'Mandarin 5000 – เรียนศัพท์จีนกลาง 5,000 คำ',
+      metaDesc: 'เรียนคำศัพท์ภาษาจีนกลางที่ใช้บ่อยที่สุด 5,000 คำ พร้อมพินอิน เกมจับคู่ เสียงอ่าน และประโยคตัวอย่าง',
+      homeTitle: 'เรียนคำศัพท์ภาษาจีนกลางที่ใช้บ่อยที่สุด 5,000 คำ',
+      homeIntro: 'จับคู่ทีละ 20 คำ แตะคำจีนเพื่อฟังเสียง และแตะรูปหลอดไฟเพื่อดูประโยคตัวอย่าง ทุกคำมีพินอินพร้อมเครื่องหมายวรรณยุกต์ และในการตั้งค่าคุณเลือกใช้ตัวย่อหรือตัวเต็มได้',
+      voiceHintText: 'เสียงอ่านฟังแปลกๆ ใช่ไหม? ลองเลือกเสียงอื่นในการตั้งค่า (เสียงที่มี ★ ฟังเป็นธรรมชาติกว่า เช่น Tingting หรือเสียง Neural)', voiceHintBtn: 'เลือกเสียง', voiceHintClose: 'ไม่ต้องแสดงอีก',
+      testMe: 'เลือกหมวดที่จะฝึก',
+      nextSet: 'ชุดต่อไป: ชุดที่ ', words: 'คำที่ ', allDone: 'ครบทุกชุดแล้ว!', replayHint: 'เล่นชุดไหนซ้ำก็ได้เพื่อเก็บดาวเพิ่ม',
+      cont: 'เรียนต่อ', start: 'เริ่มเลย', replay1: 'เล่นชุดที่ 1 อีกครั้ง',
+      setsDone: 'ชุดที่ผ่านแล้ว', wordsPracticed: 'คำที่ฝึกแล้ว', stars: 'ดาว',
+      setWord: 'ชุดที่ ', matchedAria: 'คำที่จับคู่แล้ว', matched: 'จับคู่แล้ว', mistake: 'ครั้งที่ผิด',
+      autoSpeak: 'อ่านออกเสียงอัตโนมัติ', shuffle: 'สลับใหม่', allSets: 'ทุกชุด',
+      listen: 'ฟังเสียง ', hintFor: 'ประโยคตัวอย่างของ ', example: 'ตัวอย่าง', listenWord: '🔊 คำศัพท์', listenSentence: '🔊 ประโยค',
+      noSpeech: 'เบราว์เซอร์นี้ไม่รองรับเสียงอ่าน',
+      noVoice: 'ไม่พบเสียงภาษาจีนกลางในอุปกรณ์นี้ กรุณาติดตั้งเสียงในการตั้งค่าของเครื่อง (ยังอ่านตัวอักษรจากหน้าจอได้ตามปกติ)',
+      complete: ' เสร็จแล้ว!', perfect: 'สมบูรณ์แบบ ไม่มีผิดเลย!', mistakesRound: ' ครั้งในรอบนี้', nextBtn: 'ชุดต่อไป →', again: 'เล่นอีกครั้ง', review: 'ทบทวน',
+      settings: 'การตั้งค่า', voice: 'เสียงอ่าน', auto: 'อัตโนมัติ', speed: 'ความเร็วเสียง', theme: 'ธีม', themeAuto: 'ตามอุปกรณ์', themeLight: 'สว่าง', themeDark: 'มืด',
+      testVoice: 'ทดสอบเสียง', play: '🔊 เล่น', voicesN: ' เสียงภาษาจีนกลางที่ใช้ได้', noVoices: 'ไม่พบเสียงภาษาจีนกลางในอุปกรณ์นี้',
+      reset: 'ล้างความคืบหน้า', confirmReset: 'ลบความคืบหน้าทั้งหมดในอุปกรณ์นี้?', language: 'ภาษาของแอป', close: 'ปิด',
+      about: 'เกี่ยวกับ Mandarin 5000',
+      about1: 'Mandarin 5000 ช่วยให้คนไทยเรียนคำศัพท์ภาษาจีนกลางที่ใช้บ่อยที่สุด 5,000 คำ แบ่งเป็นชุดละ 20 คำ (ฝึกทั้งหมด หรือเลือกเฉพาะคำนาม คำกริยา คำคุณศัพท์ ฯลฯ) ด้วยเกมจับคู่ เสียงอ่าน ประโยคตัวอย่าง และพินอินพร้อมเครื่องหมายวรรณยุกต์ (มีทั้งตัวย่อและตัวเต็ม)',
+      about2: 'ความหมายภาษาไทยและคำแปลประโยคในแอปนี้เขียนขึ้นเฉพาะสำหรับแอปนี้ เป็นคำแปลสั้นๆ เพื่อการเรียนรู้ ไม่ใช่ความหมายแบบพจนานุกรม และอาจมีข้อผิดพลาดได้บ้าง ส่วนตัวเต็มและพินอินสร้างโดยอัตโนมัติ จึงอาจผิดในบางคำ (โดยเฉพาะคำที่อ่านได้มากกว่าหนึ่งเสียง) หากพบข้อผิดพลาด โปรดกดปุ่มส่งความเห็นเพื่อแจ้งผู้จัดทำ',
+      ack: 'กิตติกรรมประกาศ',
+      about3: 'การเลือกและเรียงลำดับคำอ้างอิงจากไลบรารี wordfreq (สถิติความถี่ของคำจากหลายแหล่ง, CC BY-SA 4.0) ตัวเต็มมาจาก OpenCC (Apache-2.0) และพินอินจาก pypinyin (MIT) ตรวจเทียบกับพจนานุกรม CC-CEDICT (CC BY-SA 4.0) รูปภาพเป็น Twemoji (CC BY 4.0) ใช้เฉพาะอันดับ การอ่าน และการแปลงตัวอักษร ส่วนความหมายและประโยคเขียนขึ้นใหม่ทั้งหมด',
+      about4: 'เสียงอ่านใช้เสียงที่มีอยู่ในอุปกรณ์หรือเบราว์เซอร์ของคุณ คุณภาพอาจแตกต่างกัน แอปนี้ไม่โหลดโค้ด ฟอนต์ หรือระบบติดตามจากภายนอก เก็บความคืบหน้าไว้ในอุปกรณ์ของคุณเท่านั้น และใช้งานแบบออฟไลน์ได้หลังจากโหลดแล้ว',
+      loadFail: 'โหลดข้อมูลคำศัพท์ไม่สำเร็จ', home: 'หน้าแรก', aboutTitle: 'เกี่ยวกับ', settingsTitle: 'การตั้งค่า',
+      feedbackBtn: 'ส่งความเห็น', feedbackTitle: 'ส่งความเห็นหรือแจ้งข้อผิดพลาด', fbType: 'ประเภท',
+      fbMistake: 'พบข้อผิดพลาดในคำศัพท์หรือคำแปล', fbSuggestion: 'ข้อเสนอแนะ', fbBug: 'แอปทำงานผิดปกติ',
+      fbWord: 'คำที่เกี่ยวข้อง (ถ้ามี)', fbMsg: 'ข้อความ', fbPlaceholder: 'เล่าให้เราฟังได้เลย เช่น คำแปลที่ถูกควรเป็นอะไร',
+      fbSend: '✉ ส่งอีเมล', fbOpenForm: 'เปิดแบบฟอร์ม', fbCopy: 'คัดลอกข้อความ', fbCopied: 'คัดลอกข้อความแล้ว', fbEmpty: 'กรุณาพิมพ์ข้อความก่อน',
+      fbNoEmail: 'ผู้จัดทำยังไม่ได้ตั้งค่าที่อยู่รับความเห็น กรุณาคัดลอกข้อความแล้วส่งให้ผู้จัดทำโดยตรง',
+      reportWord: '⚑ แจ้งปัญหาคำนี้',
+      reviewBtn: 'ทบทวนคำที่พลาด', reviewCount: ' คำรอทบทวน', reviewNone: 'ยังไม่มีคำที่พลาด เยี่ยมมาก!', reviewStart: 'เริ่มทบทวน',
+      reviewDone: 'ทบทวนเสร็จแล้ว!', reviewLeft: ' คำยังต้องทบทวนต่อ', reviewAllClear: 'ไม่เหลือคำที่พลาดแล้ว เก่งมาก!', reviewAgain: 'ทบทวนอีกรอบ'
+    },
+    en: {
+      appName: 'Mandarin 5000', pageTitle: 'Mandarin 5000 – Learn 5,000 Mandarin words',
+      metaDesc: 'Learn the 5,000 most common Mandarin words with pinyin, matching games, speech and example sentences.',
+      homeTitle: 'Learn the 5,000 most common Mandarin words',
+      homeIntro: 'Match 20 words at a time. Tap a Chinese word to hear it, and tap the light bulb for an example sentence. Each word shows its pinyin with tone marks; in Settings you can switch between simplified and traditional characters.',
+      voiceHintText: 'Does the voice sound odd? Pick another one in Settings (voices marked ★ sound more natural, e.g. Tingting or a Neural voice).', voiceHintBtn: 'Pick a voice', voiceHintClose: 'Don’t show again',
+      testMe: 'Choose what to practise',
+      nextSet: 'Next: set ', words: 'Words ', allDone: 'All sets complete!', replayHint: 'Replay any set to improve your stars.',
+      cont: 'Continue', start: 'Start', replay1: 'Replay set 1',
+      setsDone: 'sets completed', wordsPracticed: 'words practised', stars: 'stars',
+      setWord: 'Set ', matchedAria: 'Matched words', matched: 'matched', mistake: 'mistake',
+      autoSpeak: 'Auto-speak', shuffle: 'Shuffle', allSets: 'All sets',
+      listen: 'Listen to ', hintFor: 'Example sentence for ', example: 'Example', listenWord: '🔊 Word', listenSentence: '🔊 Sentence',
+      noSpeech: 'Speech is not supported in this browser.',
+      noVoice: 'No Mandarin voice found on this device. Install one in your system settings (the Chinese text can still be read from the screen).',
+      complete: ' complete!', perfect: 'Perfect – no mistakes!', mistakesRound: ' this round.', nextBtn: 'Next set →', again: 'Play again', review: 'Review',
+      settings: 'Settings', voice: 'Voice', auto: 'Automatic', speed: 'Speech speed', theme: 'Theme', themeAuto: 'Match device', themeLight: 'Light', themeDark: 'Dark',
+      testVoice: 'Test the voice', play: '🔊 Play', voicesN: ' Mandarin voice(s) available', noVoices: 'No Mandarin voice detected on this device',
+      reset: 'Reset progress', confirmReset: 'Erase all progress on this device?', language: 'App language', close: 'Close',
+      about: 'About Mandarin 5000',
+      about1: 'Mandarin 5000 helps English speakers learn the 5,000 most frequently used Mandarin words, in sets of 20 (practise everything, or pick nouns, verbs, adjectives and so on), using matching games, spoken pronunciation, example sentences and pinyin with tone marks (simplified and traditional characters).',
+      about2: 'The English meanings, example sentences and translations in this app were written specifically for it. They are short, simple glosses meant for learning, not dictionary entries, and may occasionally contain mistakes. The traditional forms and the pinyin are generated automatically and may be wrong for some words (especially words with more than one reading). If you find a mistake, please use the feedback button to tell the app’s author.',
+      ack: 'Acknowledgements',
+      about3: 'The choice and order of words was informed by the wordfreq library (word-frequency data from many sources, CC BY-SA 4.0). Traditional characters come from OpenCC (Apache-2.0) and pinyin readings from pypinyin (MIT), checked against the CC-CEDICT dictionary (CC BY-SA 4.0). Pictures are Twemoji (CC BY 4.0). Only rankings, readings and character conversions were used; the meanings and sentences are original.',
+      about4: 'Pronunciation uses the speech voices built into your device or browser; quality varies. The app does not load any third-party code, fonts or tracking, stores progress only on your device, and works offline once loaded.',
+      loadFail: 'Vocabulary data failed to load.', home: 'Home', aboutTitle: 'About', settingsTitle: 'Settings',
+      feedbackBtn: 'Feedback', feedbackTitle: 'Send feedback or report a mistake', fbType: 'Type',
+      fbMistake: 'Mistake in a word or translation', fbSuggestion: 'Suggestion', fbBug: 'Something is broken',
+      fbWord: 'Word concerned (optional)', fbMsg: 'Message', fbPlaceholder: 'Tell us what is wrong, e.g. what the correct translation should be',
+      fbSend: '✉ Send by email', fbOpenForm: 'Open the form', fbCopy: 'Copy message', fbCopied: 'Message copied', fbEmpty: 'Please write a message first.',
+      fbNoEmail: 'The author has not set up a feedback address yet. Copy the message and send it to the author directly.',
+      reportWord: '⚑ Report a problem with this word',
+      reviewBtn: 'Review missed words', reviewCount: ' words to review', reviewNone: 'No missed words yet – great!', reviewStart: 'Start review',
+      reviewDone: 'Review complete!', reviewLeft: ' words still to review', reviewAllClear: 'No missed words left – well done!', reviewAgain: 'Review again'
     }
   };
   /* ==== END APP CONFIG ==== */
@@ -301,9 +589,14 @@
     posLabel = c.posLabel; STR = c.STR; APP_ID = 'frequency5000/' + id;
     if (!c.branded) {
       c.branded = true;
-      ['th', 'en'].forEach(function (l) {
+      ['th', 'fr'].forEach(function (l) {           // courses without an interface in this language show the English one
+        if (!STR[l]) STR[l] = STR.en;
+        if (!CAT_NAMES[l]) CAT_NAMES[l] = CAT_NAMES.en;
+        if (!CAT_HINT[l]) CAT_HINT[l] = CAT_HINT.en;
+      });
+      ['th', 'en', 'fr'].forEach(function (l) {
         Object.keys(STR[l]).forEach(function (k) {
-          if (typeof STR[l][k] === 'string') STR[l][k] = STR[l][k].replace(/Mille Mots|Eng 5000/g, BRAND);
+          if (typeof STR[l][k] === 'string') STR[l][k] = STR[l][k].replace(/Mille Mots|Eng 5000|Thai 5000|Mandarin 5000/g, BRAND);
         });
       });
     }
@@ -359,15 +652,16 @@
   var memoryRaw = null;
   function navLang() {
     var l = (navigator.language || (navigator.languages && navigator.languages[0]) || '').toLowerCase();
-    return l.indexOf('th') === 0 ? 'th' : 'en';
+    return l.indexOf('th') === 0 ? 'th' : (l.indexOf('fr') === 0 ? 'fr' : 'en');
   }
   function emptySlot() { return { sets: {}, missed: {}, s: {} }; }
   function defaultRaw() {
-    return { ui: { theme: 'auto', lang: navLang(), autoSpeak: true, course: navLang() === 'th' ? 'en' : 'fr' }, courses: { fr: emptySlot(), en: emptySlot() } };
+    return { ui: { theme: 'auto', lang: navLang(), autoSpeak: true, course: navLang() === 'en' ? 'fr' : 'en' }, courses: { fr: emptySlot(), en: emptySlot(), th: emptySlot(), zh: emptySlot() } };
   }
   function importLegacy(raw) {
     var firstUi = true;
     COURSE_IDS.forEach(function (id) {
+      if (!LEGACY[id]) return;
       try {
         var old = JSON.parse(window.localStorage.getItem(LEGACY[id]) || 'null');
         if (!old || typeof old !== 'object') return;
@@ -411,32 +705,36 @@
   var store = null;   // runtime view of the ACTIVE course: {sets, missed, settings:{...}}
   function loadCourseStore(id) {
     var sl = RAW.courses[id];
-    var st = { sets: sl.sets, missed: sl.missed, settings: { autoSpeak: RAW.ui.autoSpeak, rate: DEFAULT_RATE, theme: RAW.ui.theme, voice: '', lang: RAW.ui.lang, cat: 'all', voiceHint: true, pics: true, picsOnly: false } };
+    var st = { sets: sl.sets, missed: sl.missed, settings: { autoSpeak: RAW.ui.autoSpeak, rate: DEFAULT_RATE, theme: RAW.ui.theme, voice: '', lang: RAW.ui.lang, cat: 'all', voiceHint: true, pics: true, picsOnly: false, script: 'simp', exPy: true } };
     Object.keys(sl.s).forEach(function (k) { if (sl.s[k] !== undefined && k in st.settings) st.settings[k] = sl.s[k]; });
     store = st;
   }
   function saveStore() {
     var sl = RAW.courses[COURSE], s = store.settings;
     sl.sets = store.sets; sl.missed = store.missed;
-    sl.s = { rate: s.rate, voice: s.voice, cat: s.cat, voiceHint: s.voiceHint, pics: s.pics, picsOnly: s.picsOnly };
+    sl.s = { rate: s.rate, voice: s.voice, cat: s.cat, voiceHint: s.voiceHint, pics: s.pics, picsOnly: s.picsOnly, script: s.script, exPy: s.exPy };
     RAW.ui = { theme: s.theme, lang: s.lang, autoSpeak: s.autoSpeak, course: COURSE };
     memoryRaw = RAW;
     try { window.localStorage.setItem(RAW_KEY, JSON.stringify(RAW)); } catch (e) { /* ignore */ }
   }
 
   /* ---------- language ---------- */
-  function lang() { return store.settings.lang === 'en' ? 'en' : 'th'; }
+  var LANGS = ['th', 'en', 'fr'];
+  function lang() { return LANGS.indexOf(store.settings.lang) < 0 ? 'th' : store.settings.lang; }
   function t(k) { return STR[lang()][k]; }
   var FLAG_TH = '<svg viewBox="0 0 30 20" width="26" height="17" preserveAspectRatio="none" aria-hidden="true"><rect width="30" height="20" fill="#A51931"/><rect y="3.33" width="30" height="13.34" fill="#F4F5F8"/><rect y="6.67" width="30" height="6.66" fill="#2D2A4A"/></svg>';
   var FLAG_GB = '<svg viewBox="0 0 60 30" width="26" height="17" preserveAspectRatio="none" aria-hidden="true"><rect width="60" height="30" fill="#012169"/><path d="M0 0L60 30M60 0L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0L60 30M60 0L0 30" stroke="#C8102E" stroke-width="2"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></svg>';
+  var FLAG_FR = '<svg viewBox="0 0 30 20" width="26" height="17" preserveAspectRatio="none" aria-hidden="true"><rect width="30" height="20" fill="#ED2939"/><rect width="20" height="20" fill="#fff"/><rect width="10" height="20" fill="#002395"/></svg>';
+  var LANG_BTN = { th: [FLAG_TH, 'ภาษาไทย', 'เปลี่ยนเป็นภาษาไทย'], en: [FLAG_GB, 'English', 'Switch to English'], fr: [FLAG_FR, 'Français', 'Passer en français'] };
+  function nextLang() { return LANGS[(LANGS.indexOf(lang()) + 1) % LANGS.length]; }
   function applyLang() {
     document.documentElement.setAttribute('lang', lang());
     // the flag shows the language you will switch TO
-    var to = lang() === 'th' ? 'en' : 'th';
+    var to = nextLang();
     var b = $('btnLang');
-    b.innerHTML = to === 'en' ? FLAG_GB : FLAG_TH;
-    b.setAttribute('aria-label', to === 'en' ? 'English' : 'ภาษาไทย');
-    b.title = to === 'en' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย';
+    b.innerHTML = LANG_BTN[to][0];
+    b.setAttribute('aria-label', LANG_BTN[to][1]);
+    b.title = LANG_BTN[to][2];
     $('btnFeedback').setAttribute('aria-label', t('feedbackBtn'));
     $('btnFeedback').title = t('feedbackBtn');
     $('btnHome').setAttribute('aria-label', t('home'));
@@ -461,7 +759,7 @@
     });
   }
   function toggleLang() {
-    store.settings.lang = lang() === 'th' ? 'en' : 'th';
+    store.settings.lang = nextLang();
     saveStore(); applyLang();
     if (!$('sheet').hidden) closeSheet();
     render();
@@ -605,12 +903,14 @@
     openSheet([
       h('h2', { id: 'sheetTitle', text: t('example') }),
       h('div', { class: 'big-hw', lang: HW_LANG, text: hw(w) }),
+      w.rom ? h('div', { class: 'rom', text: w.rom }) : null,
       h('div', { class: 'muted', lang: meanLang(), text: posTag(w) + ' · ' + mean(w) }),
-      h('p', { class: 'sentence', lang: HW_LANG, text: w.ex }),
+      h('p', { class: 'sentence', lang: HW_LANG, text: exText(w) }),
+      exPyLine(w),
       h('p', { class: 'muted', lang: meanLang(), text: exTr(w) }),
       h('div', { class: 'row' }, [
         h('button', { class: 'btn small', onclick: function () { speak(hw(w)); } }, [t('listenWord')]),
-        h('button', { class: 'btn small', onclick: function () { speak(w.ex); } }, [t('listenSentence')]),
+        h('button', { class: 'btn small', onclick: function () { speak(exText(w)); } }, [t('listenSentence')]),
         h('button', { class: 'btn small', onclick: function () { openFeedback(w); } }, [t('reportWord')])
       ])
     ]);
@@ -691,6 +991,7 @@
   }
   function wordRange(a, b) { return t('words') + a + '–' + b; }
   function mistakeText(m) {
+    if (lang() === 'fr') return m + (m > 1 ? ' erreurs' : ' erreur');
     return lang() === 'th' ? m + ' ' + t('mistake') : m + (m === 1 ? ' mistake' : ' mistakes');
   }
 
@@ -721,7 +1022,8 @@
     var cui = COURSE_UI[lang()];
     var cs = h('div', { class: 'cat-menu course-switch', role: 'group', 'aria-label': cui.label });
     COURSE_IDS.forEach(function (id) {
-      cs.appendChild(h('button', { class: 'chip course-chip', type: 'button', lang: id === 'fr' ? (lang() === 'th' ? 'th' : 'en') : (lang() === 'th' ? 'th' : 'en'), 'aria-pressed': String(id === COURSE), onclick: function () { switchCourse(id); } }, [cui[id]]));
+      if (id === 'th' && lang() === 'th' && COURSE !== id) return;   // the Thai course is for non-Thai speakers
+      cs.appendChild(h('button', { class: 'chip course-chip', type: 'button', lang: lang(), 'aria-pressed': String(id === COURSE), onclick: function () { switchCourse(id); } }, [cui[id]]));
     });
     root.appendChild(h('div', { class: 'course-wrap' }, [h('div', { class: 'range-label', style: 'margin-top:0', text: cui.label }), cs]));
     root.appendChild(h('h1', { text: t('homeTitle') }));
@@ -871,7 +1173,7 @@
       var w = words[i];
       var main = h('button', { class: 'tile-main', type: 'button', 'aria-pressed': 'false' }, [
         h('span', { class: 'label', text: hw(w) }),
-        h('span', { class: 'pos', text: posTag(w) })
+        h('span', { class: 'pos', text: romTag(w) + posTag(w) })
       ]);
       var listen = h('button', {
         class: 'mini', type: 'button', 'aria-label': t('listen') + hw(w), title: t('listen'),
@@ -983,8 +1285,8 @@
     words.forEach(function (w) {
       list.appendChild(h('li', {}, [
         h('div', { class: 'w' }, [
-          h('div', {}, [picNode(w), h('span', { class: 'hw', lang: HW_LANG, text: hw(w) }), ' – ', h('span', { lang: meanLang(), text: mean(w) })]),
-          h('div', { class: 'ex', lang: HW_LANG, text: w.ex }),
+          h('div', {}, [picNode(w), h('span', { class: 'hw', lang: HW_LANG, text: hw(w) }), w.rom ? ' (' + w.rom + ')' : '', ' – ', h('span', { lang: meanLang(), text: mean(w) })]),
+          h('div', { class: 'ex', lang: HW_LANG, text: exText(w) }),
           h('div', { class: 'ex', lang: meanLang(), text: exTr(w) })
         ]),
         h('div', { class: 'row-tight' }, [
@@ -1053,15 +1355,24 @@
     function setLang(l) {
       store.settings.lang = l; saveStore(); applyLang(); render(); openSettings();
     }
-    var langSw = h('div', { class: 'lang-switch', role: 'group', 'aria-label': 'Language / ภาษา' }, [
+    var langSw = h('div', { class: 'lang-switch', role: 'group', 'aria-label': 'Language / ภาษา / Langue' }, [
       h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'th'), lang: 'th', onclick: function () { setLang('th'); } }, ['ไทย']),
-      h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'en'), lang: 'en', onclick: function () { setLang('en'); } }, ['English'])
+      h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'en'), lang: 'en', onclick: function () { setLang('en'); } }, ['English']),
+      h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'fr'), lang: 'fr', onclick: function () { setLang('fr'); } }, ['Français'])
     ]);
 
     var picToggle = h('button', {
       class: 'btn small toggle', 'aria-pressed': String(store.settings.pics !== false),
       onclick: function () { store.settings.pics = store.settings.pics === false; saveStore(); picToggle.setAttribute('aria-pressed', String(store.settings.pics !== false)); }
     }, [THEME_UI[lang()].showPics]);
+    var scriptField = null;
+    if (COURSE === 'zh') {
+      var ZU = { th: ['ตัวอักษร', 'ตัวย่อ 简体', 'ตัวเต็ม 繁體', 'พินอินใต้ประโยค'], en: ['Characters', 'Simplified 简体', 'Traditional 繁體', 'Pinyin under sentences'], fr: ['Caractères', 'Simplifiés 简体', 'Traditionnels 繁體', 'Pinyin sous les phrases'] }[lang()];
+      var bS = h('button', { class: 'btn small', 'aria-pressed': String(store.settings.script !== 'trad'), onclick: function () { store.settings.script = 'simp'; saveStore(); bS.setAttribute('aria-pressed', 'true'); bT.setAttribute('aria-pressed', 'false'); } }, [ZU[1]]);
+      var bT = h('button', { class: 'btn small', 'aria-pressed': String(store.settings.script === 'trad'), onclick: function () { store.settings.script = 'trad'; saveStore(); bT.setAttribute('aria-pressed', 'true'); bS.setAttribute('aria-pressed', 'false'); } }, [ZU[2]]);
+      var pyT = h('button', { class: 'btn small toggle', 'aria-pressed': String(store.settings.exPy !== false), onclick: function () { store.settings.exPy = store.settings.exPy === false; saveStore(); pyT.setAttribute('aria-pressed', String(store.settings.exPy !== false)); } }, [ZU[3]]);
+      scriptField = h('div', { class: 'field col-field' }, [h('label', { text: ZU[0] }), h('div', { class: 'lang-switch', role: 'group' }, [bS, bT, pyT])]);
+    }
     var reset = h('button', {
       class: 'btn small',
       onclick: function () {
@@ -1077,6 +1388,7 @@
       h('div', { class: 'field' }, [h('label', { text: t('voice') }), voiceSel]),
       h('div', { class: 'field' }, [h('label', { text: t('speed') }), rate]),
       h('div', { class: 'field' }, [h('label', { text: t('theme') }), theme]),
+      scriptField,
       h('div', { class: 'field' }, [h('span', { text: '🖼' }), picToggle]),
       h('div', { class: 'field' }, [h('span', { text: t('testVoice') }), h('button', { class: 'btn small', onclick: function () { speak(TEST_PHRASE); } }, [t('play')])]),
       h('div', { class: 'field' }, [h('span', { class: 'muted', text: voices.length ? voices.length + t('voicesN') : t('noVoices') }), reset])
