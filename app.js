@@ -729,12 +729,20 @@
   function nextLang() { return LANGS[(LANGS.indexOf(lang()) + 1) % LANGS.length]; }
   function applyLang() {
     document.documentElement.setAttribute('lang', lang());
-    // the flag shows the language you will switch TO
-    var to = nextLang();
-    var b = $('btnLang');
-    b.innerHTML = LANG_BTN[to][0];
-    b.setAttribute('aria-label', LANG_BTN[to][1]);
-    b.title = LANG_BTN[to][2];
+    // one flag button per interface language; the current one is highlighted
+    var g = $('btnLang');
+    g.innerHTML = '';
+    LANGS.forEach(function (l) {
+      var fb = document.createElement('button');
+      fb.type = 'button';
+      fb.className = 'icon-btn flag-btn';
+      fb.innerHTML = LANG_BTN[l][0];
+      fb.setAttribute('aria-label', LANG_BTN[l][1]);
+      fb.setAttribute('aria-pressed', String(l === lang()));
+      fb.title = LANG_BTN[l][2];
+      fb.addEventListener('click', function () { setUiLang(l); });
+      g.appendChild(fb);
+    });
     $('btnFeedback').setAttribute('aria-label', t('feedbackBtn'));
     $('btnFeedback').title = t('feedbackBtn');
     $('btnHome').setAttribute('aria-label', t('home'));
@@ -758,8 +766,9 @@
       go('#/');
     });
   }
-  function toggleLang() {
-    store.settings.lang = nextLang();
+  function setUiLang(l) {
+    if (l === lang()) return;
+    store.settings.lang = l;
     saveStore(); applyLang();
     if (!$('sheet').hidden) closeSheet();
     render();
@@ -1412,7 +1421,6 @@
   $('btnHome').addEventListener('click', function () { go('#/'); });
   $('btnSettings').addEventListener('click', openSettings);
   $('btnAbout').addEventListener('click', openAbout);
-  $('btnLang').addEventListener('click', toggleLang);
   $('btnFeedback').addEventListener('click', function () { openFeedback(null); });
 
   /* ---------- boot ---------- */
