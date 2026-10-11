@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frequency5000</title>
+<meta name="description" content="Learn the 5,000 most common French or English words with matching games, speech and example sentences. Thai and English interface.">
+<meta name="theme-color" content="#4b3fa8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <button id="btnHome" class="brand" aria-label="Home">
+    <span class="logo" aria-hidden="true">F</span>
+    <span class="brand-text">Frequency5000</span>
+  </button>
+  <div class="top-actions">
+    <button id="btnLang" class="icon-btn flag-btn" aria-label="Language" title="Language"></button>
+    <button id="btnFeedback" class="icon-btn" aria-label="Feedback" title="Feedback">&#128172;</button>
+    <button id="btnSettings" class="icon-btn" aria-label="Settings" title="Settings">&#9881;</button>
+    <button id="btnAbout" class="icon-btn" aria-label="About" title="About">i</button>
+  </div>
+</header>
+
+<main id="app" tabindex="-1" aria-live="polite">Loading… / กำลังโหลด…</main>
+
+<div id="sheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-card">
+    <button id="sheetClose" class="icon-btn sheet-close" aria-label="Close">&times;</button>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<noscript><p class="noscript">This app needs JavaScript to run.</p></noscript>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
