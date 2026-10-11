@@ -5,7 +5,8 @@
   var COURSE_UI = {
     th: { label: 'เลือกภาษาที่จะเรียน', fr: 'ภาษาฝรั่งเศส (Français)', en: 'ภาษาอังกฤษ (English)', th: 'ภาษาไทย (Thai)', zh: 'ภาษาจีนกลาง (中文)' },
     en: { label: 'I want to learn', fr: 'French (Français)', en: 'English', th: 'Thai (ไทย)', zh: 'Mandarin Chinese (中文)' },
-    fr: { label: 'Je veux apprendre', fr: 'Le français', en: 'L’anglais (English)', th: 'Le thaï (ไทย)', zh: 'Le mandarin (中文)' }
+    fr: { label: 'Je veux apprendre', fr: 'Le français', en: 'L’anglais (English)', th: 'Le thaï (ไทย)', zh: 'Le mandarin (中文)' },
+    zh: { label: '我想学习', fr: '法语 (Français)', en: '英语 (English)', th: '泰语 (ไทย)', zh: '中文 (Mandarin)' }
   };
   var THEME_UI = {
     th: {
@@ -28,6 +29,13 @@
       credit: 'Images : Twemoji par Twitter, Inc. et d’autres contributeurs, utilisées sous licence CC-BY 4.0.',
       freqNote: 'La liste principale de 5 000 mots est choisie uniquement selon la fréquence d’usage réelle. Les mots des thèmes qui n’en font pas partie sont classés par fréquence à l’intérieur de leur thème.',
       names: { animals: 'Animaux', food: 'Nourriture et boissons', body: 'Corps et vêtements', home: 'Maison et famille', town: 'Ville et voyage', nature: 'Nature et météo', school: 'École, travail et loisirs', basics: 'Couleurs, nombres et temps', more: 'Autres mots' }
+    },
+    zh: {
+      menu: '主题分类(配图)', hint: '按主题分组的单词,配有图片,每个主题内按词频排序——很适合孩子。',
+      showPics: '显示图片', picsOnly: '只看图片(隐藏释义)', picsOnlyShort: '🖼 只看图片',
+      credit: '图片:Twemoji,由 Twitter, Inc. 及其他贡献者提供,依据 CC-BY 4.0 授权使用。',
+      freqNote: '5,000 词主表完全按真实使用频率挑选。主题中不在主表里的词,则在各自主题内按词频排序。',
+      names: { animals: '动物', food: '饮食', body: '身体与服饰', home: '家与家人', town: '城镇与出行', nature: '自然与天气', school: '学校、工作与娱乐', basics: '颜色、数字与时间', more: '更多词汇' }
     }
   };
   var COURSE = 'fr';
@@ -189,13 +197,21 @@
   function hw(w) { return w.en; }
   function wkey(w) { return w.en + '|' + w.pos; }
   // Meanings and example translations follow the app language: French for French speakers, Thai otherwise.
-  function meanLang() { return lang() === 'fr' ? 'fr' : 'th'; }
-  function mean(w) { return lang() === 'fr' && w.fr ? w.fr : w.th; }
-  function exTr(w) { return lang() === 'fr' && w.exFr ? w.exFr : w.exTh; }
+  // Chinese speakers: Chinese (simplified or traditional, per the 简体/繁體 setting).
+  function trad() { return store.settings.script === 'trad'; }
+  function meanLang() { return lang() === 'fr' ? 'fr' : lang() === 'zh' ? (trad() ? 'zh-Hant' : 'zh-Hans') : 'th'; }
+  function mean(w) {
+    if (lang() === 'zh' && w.zh) return trad() && w.zt ? w.zt : w.zh;
+    return lang() === 'fr' && w.fr ? w.fr : w.th;
+  }
+  function exTr(w) {
+    if (lang() === 'zh' && w.exZh) return trad() && w.ezt ? w.ezt : w.exZh;
+    return lang() === 'fr' && w.exFr ? w.exFr : w.exTh;
+  }
   function tparts(g, fr) {
     var out = {};
-    g.split(/[\/,;]/).forEach(function (x) {
-      x = x.replace(/\(.*?\)/g, '').trim();
+    g.split(/[\/,;，；、]/).forEach(function (x) {
+      x = x.replace(/[\(（].*?[\)）]/g, '').trim();
       if (fr) x = x.toLowerCase().replace(/^(le |la |les |l'|un |une |des |se |s')/, '');
       if (x) out[x] = 1;
     });
@@ -207,7 +223,11 @@
     if (Object.keys(pa).some(function (k) { return pb[k]; })) return true;
     if (a.fr && b.fr) {
       var fa = tparts(a.fr, true), fb = tparts(b.fr, true);
-      return Object.keys(fa).some(function (k) { return fb[k]; });
+      if (Object.keys(fa).some(function (k) { return fb[k]; })) return true;
+    }
+    if (a.zh && b.zh) {
+      var za = tparts(a.zh), zb = tparts(b.zh);
+      return Object.keys(za).some(function (k) { return zb[k]; });
     }
     return false;
   }
@@ -227,17 +247,21 @@
   var CAT_NAMES = {
     th: { all: 'ทั้งหมด', noun: 'คำนาม', verb: 'คำกริยา', adjective: 'คำคุณศัพท์', adverb: 'คำกริยาวิเศษณ์', preposition: 'คำบุพบท', other: 'อื่นๆ' },
     en: { all: 'All', noun: 'Nouns', verb: 'Verbs', adjective: 'Adjectives', adverb: 'Adverbs', preposition: 'Prepositions', other: 'Other' },
-    fr: { all: 'Tous', noun: 'Noms', verb: 'Verbes', adjective: 'Adjectifs', adverb: 'Adverbes', preposition: 'Prépositions', other: 'Autres' }
+    fr: { all: 'Tous', noun: 'Noms', verb: 'Verbes', adjective: 'Adjectifs', adverb: 'Adverbes', preposition: 'Prépositions', other: 'Autres' },
+    zh: { all: '全部', noun: '名词', verb: '动词', adjective: '形容词', adverb: '副词', preposition: '介词', other: '其他' }
   };
   var CAT_HINT = {
     th: 'อื่นๆ = สรรพนาม จำนวน ตัวกำหนด สันธาน อุทาน และคำนำหน้านาม',
     en: 'Other = pronouns, numbers, determiners, conjunctions, interjections and articles',
-    fr: 'Autres = pronoms, nombres, déterminants, conjonctions, interjections et articles'
+    fr: 'Autres = pronoms, nombres, déterminants, conjonctions, interjections et articles',
+    zh: '其他 = 代词、数词、限定词、连词、感叹词和冠词'
   };
+  var POS_ZH = { noun: '名词', verb: '动词', adjective: '形容词', adverb: '副词', preposition: '介词', pronoun: '代词', number: '数词', determiner: '限定词', conjunction: '连词', interjection: '感叹词', article: '冠词' };
   var POS_TH = { noun: 'นาม', verb: 'กริยา', adjective: 'คุณศัพท์', adverb: 'กริยาวิเศษณ์', preposition: 'บุพบท', pronoun: 'สรรพนาม', number: 'จำนวน', determiner: 'ตัวกำหนด', conjunction: 'สันธาน', interjection: 'อุทาน', article: 'คำนำหน้านาม' };
   var POS_FR = { noun: 'nom', verb: 'verbe', adjective: 'adjectif', adverb: 'adverbe', preposition: 'préposition', pronoun: 'pronom', number: 'nombre', determiner: 'déterminant', conjunction: 'conjonction', interjection: 'interjection', article: 'article' };
   function posLabel(p) {
     if (lang() === 'fr' && POS_FR[p]) return POS_FR[p] + ' (' + p + ')';
+    if (lang() === 'zh' && POS_ZH[p]) return POS_ZH[p] + ' (' + p + ')';
     return lang() === 'th' && POS_TH[p] ? POS_TH[p] + ' (' + p + ')' : p;
   }
 
@@ -346,6 +370,41 @@
       reportWord: '⚑ Signaler un problème avec ce mot',
       reviewBtn: 'Réviser les mots ratés', reviewCount: ' mots à réviser', reviewNone: 'Aucun mot raté pour l’instant – bravo !', reviewStart: 'Commencer la révision',
       reviewDone: 'Révision terminée !', reviewLeft: ' mots restent à réviser', reviewAllClear: 'Plus aucun mot raté – bien joué !', reviewAgain: 'Réviser encore'
+    },
+    zh: {
+      appName: 'Eng 5000', pageTitle: 'Eng 5000 – 学习 5,000 个英语常用词',
+      metaDesc: '通过配对游戏、真人发音和例句,学习最常用的 5,000 个英语单词。免费,可离线使用。',
+      homeTitle: '学习最常用的 5,000 个英语单词',
+      homeIntro: '每次配对 20 个词。点按英语单词可听发音,点按灯泡可查看例句。',
+      voiceHintText: '发音听起来怪怪的?请在设置里换一个声音(带 ★ 的声音更自然,例如 Samantha)。', voiceHintBtn: '选择声音', voiceHintClose: '不再显示',
+      testMe: '选择要练习的内容',
+      nextSet: '下一组:', words: '单词 ', allDone: '所有组都完成了!', replayHint: '可以重玩任意一组,争取更多星星。',
+      cont: '继续', start: '开始', replay1: '重玩第 1 组',
+      setsDone: '组已完成', wordsPracticed: '个单词已练习', stars: '颗星',
+      setWord: '', matchedAria: '已配对的单词', matched: '已配对', mistake: '个错误',
+      autoSpeak: '自动朗读', shuffle: '重新洗牌', allSets: '全部组',
+      listen: '听发音:', hintFor: '例句:', example: '例句', listenWord: '🔊 单词', listenSentence: '🔊 句子',
+      noSpeech: '此浏览器不支持语音朗读。',
+      noVoice: '此设备上没有找到英语语音,请在系统设置中安装。',
+      complete: ' 完成!', perfect: '完美——一个错误都没有!', mistakesRound: '(本轮)', nextBtn: '下一组 →', again: '再玩一次', review: '复习',
+      settings: '设置', voice: '语音', auto: '自动', speed: '语速', theme: '主题', themeAuto: '跟随设备', themeLight: '浅色', themeDark: '深色',
+      testVoice: '试听语音', play: '🔊 播放', voicesN: ' 个可用的英语语音', noVoices: '此设备上没有检测到英语语音',
+      reset: '清除学习进度', confirmReset: '要清除此设备上的全部学习进度吗?', language: '应用语言', close: '关闭',
+      about: '关于 Eng 5000',
+      about1: 'Eng 5000 帮助说中文的朋友学习最常用的 5,000 个英语单词,每组 20 个词(可以练习全部词汇,也可以只选名词、动词、形容词等),通过配对游戏、语音朗读和例句来学习。',
+      about2: '本应用中的中文释义和例句翻译是专门为本应用编写的。它们是为学习而写的简短译文,并非词典词条,偶尔可能有错误。如果发现问题,请用“反馈”按钮告诉应用作者。',
+      ack: '致谢',
+      about3: '单词的选择和排序参考了根据电影和电视字幕统计的词频(Hermit Dave 的“FrequencyWords”项目,基于 OpenSubtitles,采用 CC BY-SA 4.0 许可)。只使用了词语的排名。释义和例句均为原创。',
+      about4: '发音使用您的设备或浏览器自带的语音,质量因设备而异。本应用不加载任何第三方代码、字体或跟踪工具,学习进度只保存在您的设备上,加载后可离线使用。',
+      loadFail: '词汇数据加载失败。', home: '首页', aboutTitle: '关于', settingsTitle: '设置',
+      feedbackBtn: '反馈', feedbackTitle: '发送反馈或报告错误', fbType: '类型',
+      fbMistake: '单词或翻译有错误', fbSuggestion: '建议', fbBug: '应用出了问题',
+      fbWord: '相关单词(选填)', fbMsg: '留言', fbPlaceholder: '请告诉我们哪里不对,例如正确的翻译应该是什么',
+      fbSend: '✉ 通过邮件发送', fbOpenForm: '打开表单', fbCopy: '复制留言', fbCopied: '留言已复制', fbEmpty: '请先写下留言。',
+      fbNoEmail: '作者还没有设置接收反馈的地址。请复制留言并直接发给作者。',
+      reportWord: '⚑ 报告这个词的问题',
+      reviewBtn: '复习错过的单词', reviewCount: ' 个词待复习', reviewNone: '还没有错过的词——太棒了!', reviewStart: '开始复习',
+      reviewDone: '复习完成!', reviewLeft: ' 个词还需要复习', reviewAllClear: '没有错过的词了——干得好!', reviewAgain: '再复习一次'
     }
   };
   /* ==== END APP CONFIG ==== */
@@ -589,12 +648,12 @@
     posLabel = c.posLabel; STR = c.STR; APP_ID = 'frequency5000/' + id;
     if (!c.branded) {
       c.branded = true;
-      ['th', 'fr'].forEach(function (l) {           // courses without an interface in this language show the English one
+      ['th', 'fr', 'zh'].forEach(function (l) {      // courses without an interface in this language show the English one
         if (!STR[l]) STR[l] = STR.en;
         if (!CAT_NAMES[l]) CAT_NAMES[l] = CAT_NAMES.en;
         if (!CAT_HINT[l]) CAT_HINT[l] = CAT_HINT.en;
       });
-      ['th', 'en', 'fr'].forEach(function (l) {
+      ['th', 'en', 'fr', 'zh'].forEach(function (l) {
         Object.keys(STR[l]).forEach(function (k) {
           if (typeof STR[l][k] === 'string') STR[l][k] = STR[l][k].replace(/Mille Mots|Eng 5000|Thai 5000|Mandarin 5000/g, BRAND);
         });
@@ -652,7 +711,7 @@
   var memoryRaw = null;
   function navLang() {
     var l = (navigator.language || (navigator.languages && navigator.languages[0]) || '').toLowerCase();
-    return l.indexOf('th') === 0 ? 'th' : (l.indexOf('fr') === 0 ? 'fr' : 'en');
+    return l.indexOf('th') === 0 ? 'th' : (l.indexOf('fr') === 0 ? 'fr' : (l.indexOf('zh') === 0 ? 'zh' : 'en'));
   }
   function emptySlot() { return { sets: {}, missed: {}, s: {} }; }
   function defaultRaw() {
@@ -719,13 +778,14 @@
   }
 
   /* ---------- language ---------- */
-  var LANGS = ['th', 'en', 'fr'];
+  var LANGS = ['th', 'en', 'fr', 'zh'];
   function lang() { return LANGS.indexOf(store.settings.lang) < 0 ? 'th' : store.settings.lang; }
   function t(k) { return STR[lang()][k]; }
   var FLAG_TH = '<svg viewBox="0 0 30 20" width="26" height="17" preserveAspectRatio="none" aria-hidden="true"><rect width="30" height="20" fill="#A51931"/><rect y="3.33" width="30" height="13.34" fill="#F4F5F8"/><rect y="6.67" width="30" height="6.66" fill="#2D2A4A"/></svg>';
   var FLAG_GB = '<svg viewBox="0 0 60 30" width="26" height="17" preserveAspectRatio="none" aria-hidden="true"><rect width="60" height="30" fill="#012169"/><path d="M0 0L60 30M60 0L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0L60 30M60 0L0 30" stroke="#C8102E" stroke-width="2"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></svg>';
   var FLAG_FR = '<svg viewBox="0 0 30 20" width="26" height="17" preserveAspectRatio="none" aria-hidden="true"><rect width="30" height="20" fill="#ED2939"/><rect width="20" height="20" fill="#fff"/><rect width="10" height="20" fill="#002395"/></svg>';
-  var LANG_BTN = { th: [FLAG_TH, 'ภาษาไทย', 'เปลี่ยนเป็นภาษาไทย'], en: [FLAG_GB, 'English', 'Switch to English'], fr: [FLAG_FR, 'Français', 'Passer en français'] };
+  var FLAG_CN = '<svg viewBox="0 0 30 20" width="26" height="17" preserveAspectRatio="none" aria-hidden="true"><rect width="30" height="20" fill="#DE2910"/><polygon fill="#FFDE00" points="5,2.2 5.9,4.9 8.7,4.9 6.4,6.6 7.3,9.3 5,7.6 2.7,9.3 3.6,6.6 1.3,4.9 4.1,4.9"/><polygon fill="#FFDE00" points="10,1 10.4,2.2 11.6,2.2 10.7,2.9 11,4.1 10,3.4 9,4.1 9.3,2.9 8.4,2.2 9.6,2.2"/><polygon fill="#FFDE00" points="12,3.5 12.4,4.7 13.6,4.7 12.7,5.4 13,6.6 12,5.9 11,6.6 11.3,5.4 10.4,4.7 11.6,4.7"/><polygon fill="#FFDE00" points="12,7 12.4,8.2 13.6,8.2 12.7,8.9 13,10.1 12,9.4 11,10.1 11.3,8.9 10.4,8.2 11.6,8.2"/><polygon fill="#FFDE00" points="10,9.2 10.4,10.4 11.6,10.4 10.7,11.1 11,12.3 10,11.6 9,12.3 9.3,11.1 8.4,10.4 9.6,10.4"/></svg>';
+  var LANG_BTN = { th: [FLAG_TH, 'ภาษาไทย', 'เปลี่ยนเป็นภาษาไทย'], en: [FLAG_GB, 'English', 'Switch to English'], fr: [FLAG_FR, 'Français', 'Passer en français'], zh: [FLAG_CN, '中文', '切换到中文'] };
   function nextLang() { return LANGS[(LANGS.indexOf(lang()) + 1) % LANGS.length]; }
   function applyLang() {
     document.documentElement.setAttribute('lang', lang());
@@ -771,6 +831,7 @@
     store.settings.lang = l;
     saveStore(); applyLang();
     if (!$('sheet').hidden) closeSheet();
+    if (l === 'zh' && COURSE !== 'en') { switchCourse('en'); return; }   // the Chinese interface is for learning English
     render();
   }
 
@@ -893,7 +954,7 @@
   function openSheet(nodes) {
     var body = $('sheetBody');
     body.textContent = '';
-    nodes.forEach(function (n) { body.appendChild(n); });
+    nodes.forEach(function (n) { if (n) body.appendChild(n); });
     lastFocus = document.activeElement;
     $('sheet').hidden = false;
     $('sheetClose').focus();
@@ -998,9 +1059,12 @@
     for (var n = 1; n <= totalSets(); n++) { var i = setInfo(n); if (!i || !i.stars) return n; }
     return null;
   }
+  function setNum(n) { return lang() === 'zh' ? '第 ' + n + ' 组' : String(n); }
+  function setNo(n) { return lang() === 'zh' ? setNum(n) : t('setWord') + n; }
   function wordRange(a, b) { return t('words') + a + '–' + b; }
   function mistakeText(m) {
     if (lang() === 'fr') return m + (m > 1 ? ' erreurs' : ' erreur');
+    if (lang() === 'zh') return m + ' 个错误';
     return lang() === 'th' ? m + ' ' + t('mistake') : m + (m === 1 ? ' mistake' : ' mistakes');
   }
 
@@ -1032,6 +1096,7 @@
     var cs = h('div', { class: 'cat-menu course-switch', role: 'group', 'aria-label': cui.label });
     COURSE_IDS.forEach(function (id) {
       if (id === 'th' && lang() === 'th' && COURSE !== id) return;   // the Thai course is for non-Thai speakers
+      if (lang() === 'zh' && id !== 'en' && COURSE !== id) return;   // Chinese speakers learn English here
       cs.appendChild(h('button', { class: 'chip course-chip', type: 'button', lang: lang(), 'aria-pressed': String(id === COURSE), onclick: function () { switchCourse(id); } }, [cui[id]]));
     });
     root.appendChild(h('div', { class: 'course-wrap' }, [h('div', { class: 'range-label', style: 'margin-top:0', text: cui.label }), cs]));
@@ -1072,7 +1137,7 @@
 
     root.appendChild(h('div', { class: 'card hero' }, [
       h('div', {}, [
-        h('b', { text: next ? (t('nextSet') + next) : t('allDone') }),
+        h('b', { text: next ? (t('nextSet') + setNum(next)) : t('allDone') }),
         h('div', { class: 'muted', text: next ? wordRange(setStart(next), setEnd(next)) : t('replayHint') })
       ]),
       h('button', { class: 'btn primary', onclick: function () { go('#/set/' + (next || 1)); } }, [next ? (done ? t('cont') : t('start')) : t('replay1')])
@@ -1104,7 +1169,7 @@
           var stars = info && info.stars ? '★'.repeat(info.stars) : '';
           grid.appendChild(h('button', {
             class: cls,
-            'aria-label': t('setWord') + n + (info && info.stars ? ', ' + info.stars + ' ' + t('stars') : ''),
+            'aria-label': setNo(n) + (info && info.stars ? ', ' + info.stars + ' ' + t('stars') : ''),
             onclick: function () { go('#/set/' + n); }
           }, [String(n), h('small', { text: stars || ' ' })]));
         })(n);
@@ -1119,12 +1184,12 @@
   /* ---------- game ---------- */
   function renderSet(n) {
     var words = getSet(n);
-    document.title = t('setWord') + n + ' – ' + t('appName');
+    document.title = setNo(n) + ' – ' + t('appName');
     withPics(words, function () {
       if (window.location.hash !== '#/set/' + n) return;
       playGame({
         words: words, review: false, n: n,
-        title: t('setWord') + n,
+        title: setNo(n),
         sub: catLabel(curCat()) + ' · ' + wordRange(setStart(n), setEnd(n)),
         again: function () { renderSet(n); }
       });
@@ -1304,7 +1369,7 @@
         ])
       ]));
     });
-    var msg = mistakes === 0 ? t('perfect') : (lang() === 'th' ? 'ผิด ' + mistakes + t('mistakesRound') : mistakeText(mistakes) + t('mistakesRound'));
+    var msg = mistakes === 0 ? t('perfect') : (lang() === 'th' ? 'ผิด ' + mistakes + t('mistakesRound') : lang() === 'zh' ? '本轮错了 ' + mistakes + ' 个' : mistakeText(mistakes) + t('mistakesRound'));
     var left = missedCount();
     var buttons;
     var head;
@@ -1320,7 +1385,7 @@
       ]);
     } else {
       head = [
-        h('h1', { text: t('setWord') + n + t('complete') }),
+        h('h1', { text: setNo(n) + t('complete') }),
         h('div', { class: 'stars', 'aria-label': stars + ' ' + t('stars'), text: '★'.repeat(stars) + '☆'.repeat(3 - stars) }),
         h('p', { class: 'muted', text: msg }),
         left ? h('p', { class: 'muted', text: left + t('reviewCount') }) : null
@@ -1362,12 +1427,14 @@
     theme.addEventListener('change', function () { store.settings.theme = theme.value; saveStore(); applyTheme(); });
 
     function setLang(l) {
+      if (l === 'zh' && COURSE !== 'en') { closeSheet(); setUiLang('zh'); return; }
       store.settings.lang = l; saveStore(); applyLang(); render(); openSettings();
     }
-    var langSw = h('div', { class: 'lang-switch', role: 'group', 'aria-label': 'Language / ภาษา / Langue' }, [
+    var langSw = h('div', { class: 'lang-switch', role: 'group', 'aria-label': 'Language / ภาษา / Langue / 语言' }, [
       h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'th'), lang: 'th', onclick: function () { setLang('th'); } }, ['ไทย']),
       h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'en'), lang: 'en', onclick: function () { setLang('en'); } }, ['English']),
-      h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'fr'), lang: 'fr', onclick: function () { setLang('fr'); } }, ['Français'])
+      h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'fr'), lang: 'fr', onclick: function () { setLang('fr'); } }, ['Français']),
+      h('button', { class: 'btn small', 'aria-pressed': String(lang() === 'zh'), lang: 'zh', onclick: function () { setLang('zh'); } }, ['中文'])
     ]);
 
     var picToggle = h('button', {
@@ -1381,6 +1448,11 @@
       var bT = h('button', { class: 'btn small', 'aria-pressed': String(store.settings.script === 'trad'), onclick: function () { store.settings.script = 'trad'; saveStore(); bT.setAttribute('aria-pressed', 'true'); bS.setAttribute('aria-pressed', 'false'); } }, [ZU[2]]);
       var pyT = h('button', { class: 'btn small toggle', 'aria-pressed': String(store.settings.exPy !== false), onclick: function () { store.settings.exPy = store.settings.exPy === false; saveStore(); pyT.setAttribute('aria-pressed', String(store.settings.exPy !== false)); } }, [ZU[3]]);
       scriptField = h('div', { class: 'field col-field' }, [h('label', { text: ZU[0] }), h('div', { class: 'lang-switch', role: 'group' }, [bS, bT, pyT])]);
+    }
+    if (COURSE === 'en' && lang() === 'zh') {
+      var bS2 = h('button', { class: 'btn small', 'aria-pressed': String(store.settings.script !== 'trad'), onclick: function () { store.settings.script = 'simp'; saveStore(); bS2.setAttribute('aria-pressed', 'true'); bT2.setAttribute('aria-pressed', 'false'); } }, ['简体']);
+      var bT2 = h('button', { class: 'btn small', 'aria-pressed': String(store.settings.script === 'trad'), onclick: function () { store.settings.script = 'trad'; saveStore(); bT2.setAttribute('aria-pressed', 'true'); bS2.setAttribute('aria-pressed', 'false'); } }, ['繁體']);
+      scriptField = h('div', { class: 'field col-field' }, [h('label', { text: '汉字 / 漢字' }), h('div', { class: 'lang-switch', role: 'group' }, [bS2, bT2])]);
     }
     var reset = h('button', {
       class: 'btn small',
