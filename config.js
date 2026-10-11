@@ -6,6 +6,6 @@
  * If both are empty, the Feedback form still works: users can copy their message and send it to you another way.
  */
 window.APP_CONFIG = {
-  feedbackEmail: '',
+  feedbackEmail: 'rahil.mundkur@outlook.com',
   feedbackUrl: ''
 };
