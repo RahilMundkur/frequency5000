@@ -25,6 +25,7 @@
   var COURSE = 'fr';
   var BRAND = 'Frequency5000';
   var DATA, CAT_IDS, APP_ID, DEFAULT_RATE, HW_LANG, SPEECH_LANG, VOICE_LANG_RE, TEST_PHRASE;
+  function posTag(w) { return posLabel(w.pos) + (w.g ? ' (' + w.g + ')' : ''); }   // French nouns written l' also show m / f
   var hw, wkey, meanLang, mean, exTr, clash, BAD_VOICES, voiceScore, CAT_NAMES, CAT_HINT, posLabel, STR;
   var COURSES = {};
   COURSES.fr = function () {
@@ -604,7 +605,7 @@
     openSheet([
       h('h2', { id: 'sheetTitle', text: t('example') }),
       h('div', { class: 'big-hw', lang: HW_LANG, text: hw(w) }),
-      h('div', { class: 'muted', lang: meanLang(), text: posLabel(w.pos) + ' · ' + mean(w) }),
+      h('div', { class: 'muted', lang: meanLang(), text: posTag(w) + ' · ' + mean(w) }),
       h('p', { class: 'sentence', lang: HW_LANG, text: w.ex }),
       h('p', { class: 'muted', lang: meanLang(), text: exTr(w) }),
       h('div', { class: 'row' }, [
@@ -870,7 +871,7 @@
       var w = words[i];
       var main = h('button', { class: 'tile-main', type: 'button', 'aria-pressed': 'false' }, [
         h('span', { class: 'label', text: hw(w) }),
-        h('span', { class: 'pos', text: posLabel(w.pos) })
+        h('span', { class: 'pos', text: posTag(w) })
       ]);
       var listen = h('button', {
         class: 'mini', type: 'button', 'aria-label': t('listen') + hw(w), title: t('listen'),
